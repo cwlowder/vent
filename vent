@@ -1,0 +1,160 @@
+#!/usr/bin/python3
+import json, sys, os
+from pprint import pprint
+from pathlib import Path
+
+local_file = 'vent.json'
+global_file = str(Path.home()) + '/.ventures_profile'
+
+commands = "commands"
+projects = "ventures"
+
+init_local_file = {
+	commands:{}
+}
+init_global_file = {
+	projects:{}
+}
+
+def _get_local_directory():
+	length = len(str(Path.cwd().parent)) - len(str(Path.cwd())) + 1
+	return str(Path.cwd())[length:]
+
+def open_local():
+	try:
+		with open(local_file, 'r') as f:
+			data = json.load(f)
+		return data
+	except:
+		return None
+
+def save_local(contents):
+	with open(local_file, 'w+') as f:
+		data = f.write(json.dumps(contents))
+	return data
+
+def open_global():
+	try:
+		with open(global_file, 'r') as f:
+			data = json.load(f)
+		return data
+	except:
+		return None
+
+def save_global(contents):
+	with open(global_file, 'w+') as f:
+		data = f.write(json.dumps(contents))
+	return data
+
+def go(args):
+	global_check = open_global()
+	if global_check == None:
+		save_global(init_global_file)
+		global_check = init_global_file
+	if len(args) != 1:
+		print("Error: make sure to use the format: vent go <venture>")
+		return
+	venture = args[0].lower()
+	if venture not in global_check[projects]:
+		print("Error: venture '" + venture + "' not found")
+		return
+	print(global_check[projects][venture])
+
+def init(args):
+	global_check = open_global()
+	if global_check == None:
+		save_global(init_global_file)
+		global_check = init_global_file
+
+	if len(args) == 1:
+		name = args[0]
+	elif len(args) == 0:
+		name = _get_local_directory()
+	else:
+		print("Error: too many arguments: vent init <name>")
+		return
+
+	if name in global_check[projects]:
+		print("Error: cannot init a new venture when an existing venture is already named: " + name)
+		return
+	local_check = open_local()
+	if local_check != None:
+		print("Error: cannot init a new venture on a already created project")
+		return
+
+	global_check[projects][name] = str(Path.cwd())
+	save_global(global_check)
+	
+	save_local(init_local_file)
+
+def add(args):
+	file = open_local()
+	if file == None:
+		print("Error: cannot add a new command without initing a venture")
+		return
+	if len(args) != 2:
+		print("Error: must specify name and command: vent add <name> <command>")
+		return
+	file[commands][args[0].lower()] = args[1]
+	save_local(file)
+
+def delete(args):
+	file = open_local()
+	if file == None:
+		print("Error: cannot delete a command without initing a venture")
+		return
+	if len(args) != 1:
+		print("Error: must specify name to delete: vent delete <name>")
+		return
+	if args[0].lower() in file[commands]:
+		del file[commands][args[0].lower()]
+		save_local(file)
+	else:
+		print("Error: cannot find " + args[0] + " in list of local commands")
+
+def list(args):
+	file = open_local()
+	if file == None:
+		print("Error: cannot list command without initing a venture")
+		return
+	print("NAME COMMAND")
+	for name, comd in file[commands].items():
+		print(name, comd)
+
+def run(args):
+	file = open_local()
+	if file == None:
+		print("Error: cannot run a command without initing a venture")
+		return
+	if len(args) != 1:
+		print("Error: must specify name to run")
+		return
+	if args[0].lower() in file[commands]:
+		os.system(file[commands][args[0].lower()])
+	else:
+		print("Error: name " + args[0].lower() + " is not defined")
+		return
+
+def parse_args(args):
+	command = args[1].lower()
+	if len(args) <= 1:
+		exit(0)
+	if command.lower() in ["go", "g"]:
+		go(args[2:])
+	elif command.lower() in ["init"]:
+		init(args[2:])
+	elif command.lower() in ["add"]:
+		add(args[2:])
+	elif command.lower() in ["list"]:
+		list(args[2:])
+	elif command.lower() in ["delete"]:
+		delete(args[2:])
+	elif command.lower() in ["run", "r"]:
+		run(args[2:])
+	else:
+		print("Error: unknown command: " + command)
+
+if __name__ == '__main__':
+	#args = [i.lower() for i in sys.argv]
+	if len(sys.argv) > 1:
+		parse_args(sys.argv)
