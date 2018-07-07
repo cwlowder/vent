@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 import json, sys, os
 from pprint import pprint
 from pathlib import Path
@@ -54,7 +54,7 @@ def go(args):
 	if len(args) != 1:
 		print("Error: make sure to use the format: vent go <venture>")
 		return
-	venture = args[0].lower()
+	venture = args[0]
 	if venture not in global_check[projects]:
 		print("Error: venture '" + venture + "' not found")
 		return
@@ -83,8 +83,8 @@ def init(args):
 		return
 
 	global_check[projects][name] = str(Path.cwd())
+	init_local_file["name"] = name
 	save_global(global_check)
-	
 	save_local(init_local_file)
 
 def add(args):
@@ -112,14 +112,43 @@ def delete(args):
 	else:
 		print("Error: cannot find " + args[0] + " in list of local commands")
 
+def find(args):
+	file = open_global()
+	if file == None:
+		print("Error: must have created a venture first")
+		return
+	key = ""
+	if len(args) == 1:
+		key = args[0]
+	else:
+		print("Error: please only specify only up to one key")
+	key = key.lower()
+	max_length = 12
+	possibilities = []
+	for project in file[projects]:
+		if key in project.lower():
+			possibilities.append(project)
+			if len(project) > max_length + 2:
+				max_length = len(project) + 2
+
+	print(("%" + str(max_length) + "s")%"Venture Name")
+	print("-"*max_length)
+	for project in possibilities:
+		print(("%" + str(max_length) + "s")%(project))
+
 def list(args):
 	file = open_local()
 	if file == None:
 		print("Error: cannot list command without initing a venture")
 		return
-	print("NAME COMMAND")
+	max_name = 8
+	for name,_ in file[commands].items():
+		if len(name) > max_name + 2:
+			max_name = len(name) + 2
+	print(("%" + str(max_name) + "s %s")%("Name", "Command"))
+	print("-" * (max_name + 9))
 	for name, comd in file[commands].items():
-		print(name, comd)
+		print(("%" + str(max_name) + "s %-s")%(name, comd))
 
 def run(args):
 	file = open_local()
@@ -141,16 +170,18 @@ def parse_args(args):
 		exit(0)
 	if command.lower() in ["go", "g"]:
 		go(args[2:])
-	elif command.lower() in ["init"]:
+	elif command.lower() in ["init", "i"]:
 		init(args[2:])
 	elif command.lower() in ["add"]:
 		add(args[2:])
-	elif command.lower() in ["list"]:
+	elif command.lower() in ["list", "ls"]:
 		list(args[2:])
-	elif command.lower() in ["delete"]:
+	elif command.lower() in ["delete", "del"]:
 		delete(args[2:])
 	elif command.lower() in ["run", "r"]:
 		run(args[2:])
+	elif command.lower() in ["find", "f"]:
+		find(args[2:])
 	else:
 		print("Error: unknown command: " + command)
 
