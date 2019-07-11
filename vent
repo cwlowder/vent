@@ -2,6 +2,7 @@
 import json, sys, os
 from pprint import pprint
 from pathlib import Path
+import argparse
 
 local_file = 'vent.json'
 global_file = str(Path.home()) + '/.ventures_profile'
@@ -51,10 +52,7 @@ def go(args):
 	if global_check == None:
 		save_global(init_global_file)
 		global_check = init_global_file
-	if len(args) != 1:
-		print("Error: make sure to use the format: vent go <venture>")
-		return
-	venture = args[0]
+	venture = args.venture
 	if venture not in global_check[projects]:
 		print("Error: venture '" + venture + "' not found")
 		return
@@ -66,13 +64,7 @@ def init(args):
 		save_global(init_global_file)
 		global_check = init_global_file
 
-	if len(args) == 1:
-		name = args[0]
-	elif len(args) == 0:
-		name = _get_local_directory()
-	else:
-		print("Error: too many arguments: vent init <name>")
-		return
+	name = args.vent_name
 
 	if name in global_check[projects]:
 		print("Error: cannot init a new venture when an existing venture is already named: " + name)
@@ -92,10 +84,7 @@ def add(args):
 	if file == None:
 		print("Error: cannot add a new command without initing a venture")
 		return
-	if len(args) != 2:
-		print("Error: must specify name and command: vent add <name> <command>")
-		return
-	file[commands][args[0].lower()] = args[1]
+	file[commands][args.command_name.lower()] = args.value
 	save_local(file)
 
 def delete(args):
@@ -103,25 +92,20 @@ def delete(args):
 	if file == None:
 		print("Error: cannot delete a command without initing a venture")
 		return
-	if len(args) != 1:
-		print("Error: must specify name to delete: vent delete <name>")
-		return
-	if args[0].lower() in file[commands]:
-		del file[commands][args[0].lower()]
+	if args.command_name.lower() in file[commands]:
+		del file[commands][args.command_name.lower()]
 		save_local(file)
+		print("Successfully deleted " + args.command_name)
 	else:
-		print("Error: cannot find " + args[0] + " in list of local commands")
+		print("Error: cannot find " + args.command_name + " in list of local commands")
 
 def find(args):
 	file = open_global()
 	if file == None:
 		print("Error: must have created a venture first")
 		return
-	key = ""
-	if len(args) == 1:
-		key = args[0]
-	else:
-		print("Error: please only specify only up to one key")
+	key = args.query
+
 	key = key.lower()
 	max_length = 12
 	possibilities = []
@@ -139,7 +123,7 @@ def find(args):
 def list(args):
 	file = open_local()
 	if file == None:
-		print("Error: cannot list command without initing a venture")
+		print("Error: cannot list commands without initing a venture")
 		return
 	max_name = 8
 	for name,_ in file[commands].items():
@@ -155,37 +139,58 @@ def run(args):
 	if file == None:
 		print("Error: cannot run a command without initing a venture")
 		return
-	if len(args) != 1:
-		print("Error: must specify name to run")
-		return
 	if args[0].lower() in file[commands]:
-		os.system(file[commands][args[0].lower()])
+		os.system(file[commands][args.command_name.lower()])
 	else:
-		print("Error: name " + args[0].lower() + " is not defined")
+		print("Error: name " + args.command_name.lower() + " is not defined")
 		return
 
+# commands = ["go", "g", "init", "i", "add", "list", "ls",
+# 			"delete", "del", "run",  "r", "find", "f"]
+
 def parse_args(args):
-	command = args[1].lower()
-	if len(args) <= 1:
-		exit(0)
-	if command.lower() in ["go", "g"]:
-		go(args[2:])
-	elif command.lower() in ["init", "i"]:
-		init(args[2:])
-	elif command.lower() in ["add"]:
-		add(args[2:])
-	elif command.lower() in ["list", "ls"]:
-		list(args[2:])
-	elif command.lower() in ["delete", "del"]:
-		delete(args[2:])
-	elif command.lower() in ["run", "r"]:
-		run(args[2:])
-	elif command.lower() in ["find", "f"]:
-		find(args[2:])
-	else:
-		print("Error: unknown command: " + command)
+	parser = argparse.ArgumentParser(description='CLI for shortcuts to commands, bookmarking and navigating projects')
+	parser.add_argument('--version', action='version', version='%(prog)s 1.0')
+
+	subparsers = parser.add_subparsers(help='sub-command help', dest="cmd")
+	subparsers.required = True
+
+	parser_go = subparsers.add_parser("go", help='go help', description="Prints the path of the venture")
+	parser_go.add_argument("venture", help="The venture you wish to navigate to")
+	parser_go.set_defaults(func=go)
+
+	parser_init = subparsers.add_parser("init", help='init help', description="Initializes a new venture")
+	parser_init.add_argument("vent_name",
+		help="The name of the new venture, defaults to parent directory",
+		default=_get_local_directory()
+	)
+	parser_init.set_defaults(func=init)
+
+	parser_add = subparsers.add_parser("add", help='add help', description="Add a new command to the current venture")
+	parser_add.add_argument("command_name", help="The name of the new command for the current venture")
+	parser_add.add_argument("value", help="The value of the new command")
+	parser_add.set_defaults(func=add)
+
+	parser_list = subparsers.add_parser("list", help='list help', description="List commands for the current venture")
+	parser_list.set_defaults(func=list)
+
+	parser_delete = subparsers.add_parser("delete", help='delete help', description="Deletes a command from the current venture")
+	parser_delete.add_argument("command_name", help="The name of the command to be deleted")
+	parser_delete.set_defaults(func=delete)
+
+	parser_run = subparsers.add_parser("run", help='run help', description="Runs a command from the current venture")
+	parser_run.add_argument("command_name", help="The name of the command to be run")
+	parser_run.set_defaults(func=run)
+
+	parser_find = subparsers.add_parser("find", help='find help', description="Finds a venture based on an optional query")
+	parser_find.add_argument("query", nargs='?', default="", help="The query to match agains the names of ventures")
+	parser_find.set_defaults(func=find)
+
+	args = parser.parse_args()
+	args.func(args)
 
 if __name__ == '__main__':
 	#args = [i.lower() for i in sys.argv]
-	if len(sys.argv) > 1:
-		parse_args(sys.argv)
+	
+	#if len(sys.argv) > 1:
+	parse_args(sys.argv)
