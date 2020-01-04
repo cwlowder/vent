@@ -21,9 +21,9 @@ def _get_local_directory():
 	length = len(str(Path.cwd().parent)) - len(str(Path.cwd())) + 1
 	return str(Path.cwd())[length:]
 
-def open_local():
+def open_local(path=Path.cwd()):
 	try:
-		with open(local_file, 'r') as f:
+		with open(path / local_file, 'r') as f:
 			data = json.load(f)
 		return data
 	except:
@@ -52,11 +52,27 @@ def go(args):
 	if global_check == None:
 		save_global(init_global_file)
 		global_check = init_global_file
-	venture = args.venture
-	if venture not in global_check[projects]:
-		print("Error: venture '" + venture + "' not found")
-		return
-	print(global_check[projects][venture])
+	if args.partial:
+		possibilities = []
+		for project in global_check[projects]:
+			if args.venture in project.lower():
+				possibilities.append(project)
+		if len(possibilities) == 1:
+			name = possibilities[0]
+			print(global_check[projects][name])
+		elif len(possibilities) > 1:
+			sys.stderr.write(f"Error: Found more than one match for '{args.venture}'\n")
+			# Limit to 5 matches
+			for name in possibilities[:5]:
+				sys.stderr.write(f"  {name}\n")
+		else:
+			sys.stderr.write(f"Error: Found no matches for '{args.venture}'\n")
+	else:
+		venture = args.venture
+		if venture not in global_check[projects]:
+			sys.stderr.write(f"Error: venture '{venture}' not found\n")
+			return
+		print(global_check[projects][venture])
 
 def init(args):
 	global_check = open_global()
@@ -67,11 +83,11 @@ def init(args):
 	name = args.vent_name
 
 	if name in global_check[projects]:
-		print("Error: cannot init a new venture when an existing venture is already named: " + name)
+		sys.stderr.write("Error: cannot init a new venture when an existing venture is already named: " + name + "\n")
 		return
 	local_check = open_local()
 	if local_check != None:
-		print("Error: cannot init a new venture on a already created project")
+		sys.stderr.write("Error: cannot init a new venture on a already created project\n")
 		return
 
 	global_check[projects][name] = str(Path.cwd())
@@ -79,10 +95,30 @@ def init(args):
 	save_global(global_check)
 	save_local(init_local_file)
 
+def source(args):
+	global_check = open_global()
+	if global_check == None:
+		save_global(init_global_file)
+		global_check = init_global_file
+
+	path = Path(args.vent_path)
+	print(path)
+
+	file = open_local(path)
+
+	name = file["name"]
+
+	if name in global_check[projects]:
+		sys.stderr.write("Error: cannot init a new venture when an existing venture is already named: " + name + "\n")
+		return
+
+	global_check[projects][name] = str(Path.cwd())
+	save_global(global_check)
+
 def add(args):
 	file = open_local()
 	if file == None:
-		print("Error: cannot add a new command without initing a venture")
+		sys.stderr.write("Error: cannot add a new command without initing a venture\n")
 		return
 	file[commands][args.command_name.lower()] = args.value
 	save_local(file)
@@ -90,19 +126,19 @@ def add(args):
 def delete(args):
 	file = open_local()
 	if file == None:
-		print("Error: cannot delete a command without initing a venture")
+		sys.stderr.write("Error: cannot delete a command without initing a venture\n")
 		return
 	if args.command_name.lower() in file[commands]:
 		del file[commands][args.command_name.lower()]
 		save_local(file)
 		print("Successfully deleted " + args.command_name)
 	else:
-		print("Error: cannot find " + args.command_name + " in list of local commands")
+		sys.stderr.write("Error: cannot find " + args.command_name + " in list of local commands\n")
 
 def find(args):
 	file = open_global()
 	if file == None:
-		print("Error: must have created a venture first")
+		sys.stderr.write("Error: must have created a venture first\n")
 		return
 	key = args.query
 
@@ -123,7 +159,7 @@ def find(args):
 def list(args):
 	file = open_local()
 	if file == None:
-		print("Error: cannot list commands without initing a venture")
+		sys.stderr.write("Error: cannot list commands without initing a venture\n")
 		return
 	max_name = 8
 	for name,_ in file[commands].items():
@@ -137,12 +173,12 @@ def list(args):
 def run(args):
 	file = open_local()
 	if file == None:
-		print("Error: cannot run a command without initing a venture")
+		sys.stderr.write("Error: cannot run a command without initing a venture\n")
 		return
 	if args[0].lower() in file[commands]:
 		os.system(file[commands][args.command_name.lower()])
 	else:
-		print("Error: name " + args.command_name.lower() + " is not defined")
+		sys.stderr.write("Error: command '" + args.command_name.lower() + "' is not defined\n")
 		return
 
 # commands = ["go", "g", "init", "i", "add", "list", "ls",
@@ -150,21 +186,31 @@ def run(args):
 
 def parse_args(args):
 	parser = argparse.ArgumentParser(description='CLI for shortcuts to commands, bookmarking and navigating projects')
-	parser.add_argument('--version', action='version', version='%(prog)s 1.0')
+	parser.add_argument('--version', action='version', version='%(prog)s 1.1.0')
 
 	subparsers = parser.add_subparsers(help='sub-command help', dest="cmd")
 	subparsers.required = True
 
 	parser_go = subparsers.add_parser("go", help='go help', description="Prints the path of the venture")
 	parser_go.add_argument("venture", help="The venture you wish to navigate to")
+	parser_go.add_argument('--partial', action="store_true", help="Signifies to search based on a portion of the venture name")
 	parser_go.set_defaults(func=go)
 
 	parser_init = subparsers.add_parser("init", help='init help', description="Initializes a new venture")
 	parser_init.add_argument("vent_name",
-		help="The name of the new venture, defaults to parent directory",
+		nargs='?',
+		help="The name of the new venture, defaults to current directory",
 		default=_get_local_directory()
 	)
 	parser_init.set_defaults(func=init)
+
+	parser_source = subparsers.add_parser("source", help='source help', description="Sources a new venture from an existing vent.json file")
+	parser_source.add_argument("vent_path",
+		nargs='?',
+		help="The path to the new venture, defaults to current directory",
+		default=str(Path.cwd())
+	)
+	parser_source.set_defaults(func=source)
 
 	parser_add = subparsers.add_parser("add", help='add help', description="Add a new command to the current venture")
 	parser_add.add_argument("command_name", help="The name of the new command for the current venture")
