@@ -60,6 +60,7 @@ def go(args):
 		if len(possibilities) == 1:
 			name = possibilities[0]
 			print(global_check[projects][name])
+			return
 		elif len(possibilities) > 1:
 			sys.stderr.write(f"Error: Found more than one match for '{args.venture}'\n")
 			# Limit to 5 matches
@@ -71,8 +72,11 @@ def go(args):
 		venture = args.venture
 		if venture not in global_check[projects]:
 			sys.stderr.write(f"Error: venture '{venture}' not found\n")
+		else:
+			print(global_check[projects][venture])
 			return
-		print(global_check[projects][venture])
+	# Do not change current directory if there is an issue
+	print(".")
 
 def init(args):
 	global_check = open_global()
@@ -102,7 +106,6 @@ def source(args):
 		global_check = init_global_file
 
 	path = Path(args.vent_path)
-	print(path)
 
 	file = open_local(path)
 
@@ -186,7 +189,7 @@ def run(args):
 
 def parse_args(args):
 	parser = argparse.ArgumentParser(description='CLI for shortcuts to commands, bookmarking and navigating projects')
-	parser.add_argument('--version', action='version', version='%(prog)s 1.1.0')
+	parser.add_argument('--version', action='version', version='%(prog)s 1.1.1')
 
 	subparsers = parser.add_subparsers(help='sub-command help', dest="cmd")
 	subparsers.required = True
