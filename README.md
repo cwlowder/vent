@@ -12,7 +12,7 @@ allows for quick navigation to different ventures
 ```bash
 # Vent
 alias vego='{ dest=$(cat -); echo "Moving to venture: $dest"; cd $(vent go $dest) 
->> /dev/null 2>&1 || echo "Unknown venture: \"$dest\"";}<<<'
+>> /dev/null || echo "Unknown venture: \"$dest\"";}<<<'
 ```
 
 ## Usage
